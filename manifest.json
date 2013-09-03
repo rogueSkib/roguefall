@@ -1,0 +1,44 @@
+{
+	"appID": "7cc56c06ff1e499d9e5608b2dc666d95",
+	"shortName": "roguefall",
+	"title": "Rogue Fall",
+	"studio": {
+		"domain": "wee.cat",
+		"name": "Wee Cat Games",
+		"stagingDomain": "staging.wee.cat"
+	},
+	"supportedOrientations": [
+		"portrait"
+	],
+	"icons": {
+		"28": "resources/images/icon.png",
+		"38": "resources/images/icon.png",
+		"48": "resources/images/icon.png",
+		"56": "resources/images/icon.png"
+	},
+	"android": {
+		"flurryKey": "",
+		"tapjoyDaily": {},
+		"tapjoyId": "",
+		"tapjoyKey": "",
+		"versionCode": 1
+	},
+	"ios": {
+		"flurryKey": "",
+		"tapjoyId": "",
+		"tapjoyKey": ""
+	},
+	"description": "",
+	"facebookEnabled": false,
+	"groups": {},
+	"handshakeEnabled": false,
+	"nativeURLScheme": "tealeaf",
+	"preload": {
+		"autoHide": true,
+		"img": "resources/images/splash.png"
+	},
+	"resources": {},
+	"targets": {},
+	"version": "1.0.0",
+	"sdkVersion": "release-0.1.27"
+}

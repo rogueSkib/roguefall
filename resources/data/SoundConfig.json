@@ -1,0 +1,13 @@
+{
+	"globals": {
+		"master": 1.0
+	},
+	"volume": {
+		"effects": {
+			"effectName": 127
+		},
+		"music": {
+			"musicName": 127
+		}
+	}
+}
