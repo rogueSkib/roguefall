@@ -39,7 +39,7 @@ exports = Class(View, function(supr) {
 		this.platforms = new Platforms({
 			parent: this.rootView,
 			gameView: this,
-			zIndex: 90,
+			zIndex: 95,
 			width: 1,
 			height: 1,
 			canHandleEvents: false,

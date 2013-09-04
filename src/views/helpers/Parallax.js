@@ -122,6 +122,7 @@ exports = Class(function() {
 		});
 
 		this.layers = {};
+		this.lastOffsetY = 0;
 	};
 
 	this.reset = function(config) {
@@ -193,17 +194,17 @@ exports = Class(function() {
 
 				// spawn views as they come onto the scren
 				while (layer.spawnY <= -layerY + BG_HEIGHT) {
-					var pdata = layer.data.pieces[~~(random() * layer.data.pieces.length)];
+					var data = layer.data.pieces[~~(random() * layer.data.pieces.length)];
 					var piece = this.piecePool.obtainView({
 						parent: layer,
 						x: 0,
 						y: layer.spawnY,
-						width: pdata.width,
-						height: pdata.height
+						width: data.width,
+						height: data.height
 					});
 
-					piece.setImage(pdata.image);
-					layer.spawnY += pdata.height + pdata.gapBase + ~~(random() * pdata.gapRange);
+					piece.setImage(data.image);
+					layer.spawnY += data.height + data.gapBase + ~~(random() * data.gapRange);
 					layer.pieces.push(piece);
 				}
 			}
