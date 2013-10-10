@@ -7,13 +7,31 @@ exports = Class(View, function(supr) {
 		gameView,
 		BG_WIDTH,
 		BG_HEIGHT,
-		PLAYER_WIDTH = 128,
-		PLAYER_HEIGHT = 128,
-		PLAYER_FEET = 108,
+		PLAYER_WIDTH = 164,
+		PLAYER_HEIGHT = 164,
+		PLAYER_FEET = 125,
 		GRAVITY = 0.003,
 		AIR_RESISTANCE = 0.0025,
 		WALL_RESISTANCE = 0.006,
 		WALL_WIDTH = 56;
+
+	var STATES = {},
+		STATE_IDLE = 0,
+		STATE_FALLING = 1,
+		STATE_WALL_SLIDING = 2,
+		STATE_DEFAULT = STATE_FALLING;
+
+	STATES[STATE_IDLE] = {
+		img: "resources/images/game/rogue/rogue_idle_0001.png"
+	};
+
+	STATES[STATE_FALLING] = {
+		img: "resources/images/game/rogue/rogue_fall_0001.png"
+	};
+
+	STATES[STATE_WALL_SLIDING] = {
+		img: "resources/images/game/rogue/rogue_wallSlide_0001.png"
+	};
 
 	this.init = function(opts) {
 		opts.width = PLAYER_WIDTH;
@@ -34,7 +52,7 @@ exports = Class(View, function(supr) {
 			parent: this,
 			width: PLAYER_WIDTH,
 			height: PLAYER_HEIGHT,
-			image: "resources/images/game/rogue.png",
+			image: STATES[STATE_DEFAULT].img,
 			canHandleEvents: false
 		});
 	};
@@ -48,6 +66,13 @@ exports = Class(View, function(supr) {
 		this.vy = 0;
 		this.ax = 0;
 		this.ay = 0;
+		this.setState(STATE_DEFAULT);
+	};
+
+	this.setState = function(state) {
+		this.state = state;
+		this.stateData = STATES[state];
+		this.imageView.setImage(this.stateData.img);
 	};
 
 	this.step = function(dt) {
@@ -57,12 +82,32 @@ exports = Class(View, function(supr) {
 			this.targetX = BG_WIDTH - WALL_WIDTH / 2;
 		}
 
+		// flip player x based on direction
+		if (this.targetX < this.x && !this.flippedX) {
+			this.flippedX = this.style.flipX = true;
+		} else if (this.targetX >= this.x && this.flippedX) {
+			this.flippedX = this.style.flipX = false;
+		}
+
 		this.x = (this.targetX + 7 * this.x) / 8;
 		this.style.x = this.x - this.width / 2;
 
 		var resistance = AIR_RESISTANCE;
 		if (this.x <= WALL_WIDTH || this.x >= BG_WIDTH - WALL_WIDTH) {
 			resistance = WALL_RESISTANCE;
+
+			// force opposite flip on walls
+			if (!this.flippedX && this.x > WALL_WIDTH) {
+				this.flippedX = this.style.flipX = true;
+			} else if (this.flippedX && this.x <= WALL_WIDTH) {
+				this.flippedX = this.style.flipX = false;
+			}
+
+			if (this.state !== STATE_WALL_SLIDING) {
+				this.setState(STATE_WALL_SLIDING);
+			}
+		} else if (this.state !== STATE_FALLING && this.vy > 0) {
+			this.setState(STATE_FALLING);
 		}
 
 		var startY = this.y;
@@ -85,6 +130,8 @@ exports = Class(View, function(supr) {
 			var platEndX = platX + platform.hitWidth;
 			if (startY + PLAYER_FEET <= platY && this.y + PLAYER_FEET >= platY) {
 				if (this.x >= platX && this.x <= platEndX) {
+					// player landing
+					this.setState(STATE_IDLE);
 					this.y = platY - PLAYER_FEET;
 					this.vy = 0;
 					this.ay = 0;
