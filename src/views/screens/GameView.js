@@ -4,6 +4,7 @@ import ui.ImageView as ImageView;
 import src.views.helpers.Parallax as Parallax;
 import src.views.helpers.Platforms as Platforms;
 import src.views.helpers.Player as Player;
+import src.views.helpers.Input as Input;
 
 exports = Class(View, function(supr) {
 
@@ -22,6 +23,7 @@ exports = Class(View, function(supr) {
 	};
 
 	this.designView = function() {
+		// all game views are children of rootView except for input
 		this.rootView = new View({
 			parent: this,
 			x: (this.style.width - BG_WIDTH) / 2,
@@ -51,6 +53,14 @@ exports = Class(View, function(supr) {
 			gameView: this,
 			zIndex: 100
 		});
+
+		this.input = new Input({
+			parent: this,
+			x: (this.style.width - BG_WIDTH) / 2,
+			y: (this.style.height - BG_HEIGHT) / 2,
+			width: BG_WIDTH,
+			height: BG_HEIGHT
+		});
 	};
 
 	this.resetView = function() {
@@ -64,19 +74,12 @@ exports = Class(View, function(supr) {
 	this.constructView = function() {};
 	this.deconstructView = function(callback) { callback && callback(); };
 
-	this.onInputStart = function(evt, pt) {
-		this.player.targetX = pt.x;
-	};
-
-	this.onInputMove = function(evt, pt) {
-		this.player.targetX = pt.x;
-	};
-
 	this.tick = function(dt) {
 		// step the player first, the others rely on offsetY
 		this.offsetY = this.player.step(dt);
 
 		this.platforms.step(dt);
 		this.parallax.step(dt);
+		this.input.step(dt);
 	};
 });

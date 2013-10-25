@@ -1,3 +1,4 @@
+import animate;
 import ui.View as View;
 import ui.SpriteView as SpriteView;
 
@@ -13,7 +14,9 @@ exports = Class(View, function(supr) {
 		GRAVITY = 0.003,
 		AIR_RESISTANCE = 0.0032,
 		WALL_RESISTANCE = 0.0064,
-		WALL_WIDTH = 56;
+		WALL_WIDTH = 56,
+		JUMP_ACCEL = -0.0125,
+		JUMP_ACCEL_TIME = 200;
 
 	var STATES = {},
 		STATE_IDLE = 0,
@@ -21,6 +24,7 @@ exports = Class(View, function(supr) {
 		STATE_FALLING = 2,
 		STATE_LANDING = 3,
 		STATE_WALL_SLIDING = 4,
+		STATE_JUMPING = 5,
 		STATE_DEFAULT = STATE_IDLE;
 
 	var PLAYER_URL = "resources/images/game/rogue/rogue";
@@ -59,6 +63,10 @@ exports = Class(View, function(supr) {
 			action: "wallSlide",
 			opts: { iterations: Infinity }
 		};
+		STATES[STATE_JUMPING] = {
+			action: "fall",
+			opts: { iterations: Infinity }
+		};
 
 		this.designView();
 		this.reset();
@@ -75,6 +83,10 @@ exports = Class(View, function(supr) {
 			autoStart: false,
 			canHandleEvents: false
 		});
+
+		this.boundJumpAccelEnd = bind(this, function() {
+			this.ignoreGravity = false;
+		});
 	};
 
 	this.reset = function() {
@@ -82,10 +94,11 @@ exports = Class(View, function(supr) {
 		this.style.y = this.y = (BG_HEIGHT - PLAYER_HEIGHT) / 2;
 		this.width = this.style.width;
 		this.height = this.style.height;
-		this.vx = 0;
-		this.vy = 0;
-		this.ax = 0;
-		this.ay = 0;
+		this.v = { x: 0, y: 0 };
+		this.a = { x: 0, y: 0 };
+		this.axAnim = animate(this.a, 'ax');
+		this.ayAnim = animate(this.a, 'ay');
+		this.ignoreGravity = false;
 		this.setState(STATE_DEFAULT);
 	};
 
@@ -95,6 +108,20 @@ exports = Class(View, function(supr) {
 			this.stateData = STATES[state];
 			this.sprite.startAnimation(this.stateData.action, this.stateData.opts);
 			this.stateData.blockInterrupts && (this.animating = true);
+		}
+	};
+
+	this.jump = function() {
+		if (this.state !== STATE_JUMPING
+			&& this.state !== STATE_FALLING)
+		{
+			this.setState(STATE_JUMPING);
+			this.ignoreGravity = true;
+			this.a.y = 0;
+
+			this.ayAnim.now({ y: JUMP_ACCEL }, JUMP_ACCEL_TIME / 2, animate.easeOut)
+			.then({ y: 0 }, JUMP_ACCEL_TIME / 2, animate.easeOut)
+			.then(this.boundJumpAccelEnd);
 		}
 	};
 
@@ -133,11 +160,11 @@ exports = Class(View, function(supr) {
 		}
 
 		var startY = this.y;
-		this.y += dt * this.vy / 2;
-		this.vy += dt * this.ay / 2;
-		this.ay = GRAVITY - this.vy * resistance;
-		this.vy += dt * this.ay / 2;
-		this.y += dt * this.vy / 2;
+		this.y += dt * this.v.y / 2;
+		this.v.y += dt * this.a.y / 2;
+		!this.ignoreGravity && (this.a.y = GRAVITY - this.v.y * resistance);
+		this.v.y += dt * this.a.y / 2;
+		this.y += dt * this.v.y / 2;
 		this.falling = !this.checkPlatformCollision(startY);
 
 		if (resistance !== WALL_RESISTANCE) {
@@ -170,8 +197,8 @@ exports = Class(View, function(supr) {
 					}
 
 					this.y = platY - PLAYER_FEET;
-					this.vy = 0;
-					this.ay = 0;
+					this.v.y = 0;
+					this.a.y = 0;
 					return true;
 				}
 			}
