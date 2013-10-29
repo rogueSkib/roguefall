@@ -15,11 +15,16 @@ exports = Class(View, function(supr) {
 		AIR_RESISTANCE = 0.0032,
 		WALL_RESISTANCE = 0.0064,
 		WALL_WIDTH = 56,
-		JUMP_ACCEL = -0.025,
-		JUMP_ACCEL_TIME = 100,
-		RUN_SPEED_MAX = 0.8,
-		RUN_ACCEL_MAX = 0.008,
-		RUN_DECEL_RANGE = 100;
+		JUMP_ACCEL = -0.02,
+		JUMP_ACCEL_TIME = 125,
+		JUMP_ROT = 2 * Math.PI,
+		JUMP_ROT_TIME = 250,
+		RUN_SPEED_MAX = 0.9,
+		RUN_ACCEL_MAX = 0.009,
+		RUN_ACCEL_TIME = 150,
+		RUN_DECEL_RANGE = 120,
+		RUN_DECEL_MIN = 0.1,
+		RUN_DECEL_SLIDE = 2.5 * RUN_DECEL_MIN;
 
 	var STATES = {},
 		STATE_IDLE = 0,
@@ -67,8 +72,9 @@ exports = Class(View, function(supr) {
 			opts: { iterations: Infinity }
 		};
 		STATES[STATE_JUMPING] = {
-			action: "fall",
-			opts: { iterations: Infinity }
+			action: "jump",
+			opts: { iterations: Infinity },
+			blockInterrupts: true
 		};
 
 		this.designView();
@@ -78,6 +84,8 @@ exports = Class(View, function(supr) {
 	this.designView = function() {
 		this.sprite = new SpriteView({
 			parent: this,
+			anchorX: PLAYER_WIDTH / 2,
+			anchorY: PLAYER_HEIGHT / 2,
 			width: PLAYER_WIDTH,
 			height: PLAYER_HEIGHT,
 			url: PLAYER_URL,
@@ -90,6 +98,14 @@ exports = Class(View, function(supr) {
 		this.boundAllowGravity = bind(this, function() {
 			this.ignoreGravity = false;
 		});
+
+		this.boundFinishFlip = bind(this, function() {
+			this.sprite.style.r = 0;
+			this.animating = false;
+			if (!this.hasLanded) {
+				this.setState(STATE_FALLING);
+			}
+		});
 	};
 
 	this.reset = function() {
@@ -99,12 +115,16 @@ exports = Class(View, function(supr) {
 		this.height = this.style.height;
 		this.v = { x: 0, y: 0 };
 		this.a = { x: 0, y: 0 };
+		this.targetX = BG_WIDTH / 2;
+		this.targetAX = 0;
 		this.axAnim = animate(this.a, 'ax');
 		this.ayAnim = animate(this.a, 'ay');
+		this.jumpAnim = animate(this.sprite, 'jump');
 		this.ignoreGravity = false;
 		this.hasLanded = false;
 		this.hasJumped = false;
 		this.hasDoubleJumped = false;
+		this.falling = false;
 		this.setState(STATE_DEFAULT);
 	};
 
@@ -130,13 +150,19 @@ exports = Class(View, function(supr) {
 			this.hasDoubleJumped = true;
 		}
 
+		this.animating = false;
 		this.setState(STATE_JUMPING);
 		this.ignoreGravity = true;
-		this.a.y = 0;
+		this.a.y > 0 && (this.a.y = 0);
+		this.sprite.style.r = 0;
 
 		this.ayAnim.now({ y: JUMP_ACCEL }, JUMP_ACCEL_TIME / 2, animate.easeOut)
 		.then({ y: 0 }, JUMP_ACCEL_TIME / 2, animate.easeOut)
 		.then(this.boundAllowGravity);
+
+		this.jumpAnim.now({ r: JUMP_ROT }, JUMP_ROT_TIME, animate.easeIn)
+		.then({ r: 2 * JUMP_ROT }, JUMP_ROT_TIME, animate.easeOut)
+		.then(this.boundFinishFlip);
 	};
 
 	this.finishLanding = function() {
@@ -148,8 +174,17 @@ exports = Class(View, function(supr) {
 		this.targetX = x;
 	};
 
+	this.stopHorz = function() {
+		this.axAnim.clear();
+		this.x = this.targetX;
+		this.v.x = 0;
+		this.a.x = 0;
+		this.targetAX = 0;
+	};
+
 	this.step = function(dt) {
-		var abs = Math.abs;
+		var abs = Math.abs,
+			pow = Math.pow;
 
 		if (this.targetX <= WALL_WIDTH) {
 			this.targetX = WALL_WIDTH / 2;
@@ -170,34 +205,29 @@ exports = Class(View, function(supr) {
 		// slow down closer to target
 		var decelMult = 1;
 		if (dx && abs(dx) < RUN_DECEL_RANGE) {
-			decelMult = 0.01 + abs(dx) / RUN_DECEL_RANGE;
+			decelMult = RUN_DECEL_MIN + (1 - RUN_DECEL_MIN) * pow(abs(dx) / RUN_DECEL_RANGE, 2);
 		}
 
 		// horizontal movement
 		var startX = this.x;
 		this.x += dt * decelMult * this.v.x / 2;
 		this.v.x += dt * this.a.x / 2;
-		if (this.x !== this.targetX && this.v.x !== runSign * RUN_SPEED_MAX) {
-			this.a.x = runSign * RUN_ACCEL_MAX;
+		if (this.x !== this.targetX
+			&& this.v.x !== runSign * RUN_SPEED_MAX
+			&& this.targetAX !== runSign * RUN_ACCEL_MAX)
+		{
+			this.targetAX = runSign * RUN_ACCEL_MAX;
+			this.axAnim.now({ x: this.targetAX }, RUN_ACCEL_TIME, animate.linear);
 		}
 		this.v.x += dt * this.a.x / 2;
 		if (abs(this.v.x) > RUN_SPEED_MAX) {
 			this.v.x = runSign * RUN_SPEED_MAX;
-			this.a.x = 0;
 		}
 		this.x += dt * decelMult * this.v.x / 2;
-		if (startX <= this.targetX && this.x >= this.targetX) {
-			this.x = this.targetX;
-			this.v.x = 0;
-			this.a.x = 0;
+		if (startX < this.targetX && this.x >= this.targetX) {
+			this.stopHorz();
 		} else if (startX >= this.targetX && this.x <= this.targetX) {
-			this.x = this.targetX;
-			this.v.x = 0;
-			this.a.x = 0;
-		} else if (this.x < WALL_WIDTH / 2) {
-			this.x = WALL_WIDTH / 2;
-		} else if ( this.x > BG_WIDTH - WALL_WIDTH / 2) {
-			this.x = BG_WIDTH - WALL_WIDTH / 2;
+			this.stopHorz();
 		}
 		this.style.x = this.x - this.width / 2;
 
@@ -223,9 +253,9 @@ exports = Class(View, function(supr) {
 		this.falling = !this.checkPlatformCollision(startY) && this.v.y > 0;
 
 		if (resistance !== WALL_RESISTANCE) {
-			if (this.falling) {
+			if (this.falling && this.state !== STATE_JUMPING) {
 				this.setState(STATE_FALLING);
-			} else if (this.hasLanded && !~~abs(this.targetX - this.x)) {
+			} else if (this.hasLanded && (dx === 0 || decelMult <= RUN_DECEL_SLIDE)) {
 				this.setState(STATE_IDLE);
 			} else if (this.hasLanded) {
 				this.setState(STATE_RUNNING);
@@ -235,7 +265,7 @@ exports = Class(View, function(supr) {
 			this.hasJumped = false;
 			this.hasDoubleJumped = false;
 		} else {
-			if (this.hasLanded && !~~abs(this.targetX - this.x)) {
+			if (this.hasLanded && (dx === 0 || decelMult <= RUN_DECEL_SLIDE)) {
 				this.setState(STATE_IDLE);
 			} else if (this.hasLanded) {
 				this.setState(STATE_RUNNING);

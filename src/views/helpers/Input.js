@@ -2,8 +2,8 @@ import ui.View as View;
 
 exports = Class(View, function(supr) {
 
-	var JUMP_PX_PER_MS = 0.1,
-		JUMP_PX_MIN = -30;
+	var JUMP_PX_PER_MS = -1,
+		JUMP_PX_MIN = -40;
 
 	var gameView;
 
@@ -37,7 +37,7 @@ exports = Class(View, function(supr) {
 				var dx = pt.x - startPt.x,
 					dy = pt.y - startPt.y,
 					elapsed = evt.when - startEvt.when;
-				if (dy < JUMP_PX_MIN && elapsed && dy / elapsed < JUMP_PX_PER_MS) {
+				if (dy < JUMP_PX_MIN && elapsed && dy / elapsed <= JUMP_PX_PER_MS) {
 					gameView.player.jump();
 					this.hasJumped = true;
 				}
