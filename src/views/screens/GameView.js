@@ -1,6 +1,8 @@
 import ui.View as View;
 import ui.ImageView as ImageView;
 
+import src.models.AppTick as AppTick;
+
 import src.views.helpers.Parallax as Parallax;
 import src.views.helpers.Platforms as Platforms;
 import src.views.helpers.Player as Player;
@@ -18,6 +20,9 @@ exports = Class(View, function(supr) {
 		controller = GC.app.controller;
 		BG_WIDTH = controller.bgWidth;
 		BG_HEIGHT = controller.bgHeight;
+
+		// smooth out the game's ticks
+		this.appTick = new AppTick();
 
 		this.designView();
 	};

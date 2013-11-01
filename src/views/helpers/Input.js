@@ -2,8 +2,22 @@ import ui.View as View;
 
 exports = Class(View, function(supr) {
 
+	// math shortcuts
+	var min = Math.min,
+		max = Math.max,
+		random = Math.random,
+		sin = Math.sin,
+		cos = Math.cos,
+		atan = Math.atan,
+		abs = Math.abs,
+		pow = Math.pow,
+		PI = Math.PI;
+
+	// player input constants
 	var JUMP_PX_PER_MS = -1,
-		JUMP_PX_MIN = -40;
+		JUMP_PX_MIN = -40,
+		RUSH_PX_PER_MS = 2,
+		RUSH_PX_MIN = 160;
 
 	var gameView;
 
@@ -15,6 +29,7 @@ exports = Class(View, function(supr) {
 		this.inputStartPt = null;
 		this.movedThisStep = false;
 		this.hasJumped = false;
+		this.hasRushed = false;
 	};
 
 	this.onInputStart = function(evt, pt) {
@@ -33,14 +48,28 @@ exports = Class(View, function(supr) {
 			this.movedThisStep = true;
 			gameView.player.setTargetX(pt.x);
 
-			if (!this.hasJumped) {
-				var dx = pt.x - startPt.x,
-					dy = pt.y - startPt.y,
-					elapsed = evt.when - startEvt.when;
-				if (dy < JUMP_PX_MIN && elapsed && dy / elapsed <= JUMP_PX_PER_MS) {
-					gameView.player.jump();
-					this.hasJumped = true;
-				}
+			var dx = pt.x - startPt.x,
+				dy = pt.y - startPt.y,
+				elapsed = evt.when - startEvt.when;
+
+			// jump check
+			if (!this.hasJumped
+				&& dy < JUMP_PX_MIN
+				&& elapsed
+				&& dy / elapsed <= JUMP_PX_PER_MS)
+			{
+				gameView.player.jump();
+				this.hasJumped = true;
+			}
+
+			// rush check
+			if (!this.hasRushed
+				&& abs(dx) >= RUSH_PX_MIN
+				&& elapsed
+				&& abs(dx / elapsed) >= RUSH_PX_PER_MS)
+			{
+				gameView.player.rush(dx);
+				this.hasRushed = true;
 			}
 		}
 	};
@@ -50,6 +79,7 @@ exports = Class(View, function(supr) {
 			this.inputStartEvt = null;
 			this.inputStartPt = null;
 			this.hasJumped = false;
+			this.hasRushed = false;
 		}
 	};
 
