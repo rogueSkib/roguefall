@@ -18,6 +18,7 @@ exports = Class(View, function(supr) {
 	// player constants
 	var controller,
 		gameView,
+		model,
 		BG_WIDTH,
 		BG_HEIGHT,
 		LEFT_WALL_X,
@@ -31,8 +32,8 @@ exports = Class(View, function(supr) {
 		PLAYER_FEET = 154,
 		GRAVITY = 0.00275,
 		AIR_RESISTANCE = 0.0032,
-		WALL_RESISTANCE = 0.0075,
-		WALL_WIDTH = 56,
+		WALL_RESISTANCE = 0.0072,
+		WALL_WIDTH = 58,
 		JUMP_ACCEL = -0.02,
 		JUMP_ACCEL_TIME = 125,
 		JUMP_ROT = 2 * PI,
@@ -56,6 +57,11 @@ exports = Class(View, function(supr) {
 		STATE_DEFAULT = STATE_IDLE;
 
 	var PLAYER_URL = "resources/images/game/rogue/rogue";
+
+	// bound callback functions
+	var boundFinishJump,
+		boundFinishFlip,
+		boundFinishRush;
 
 	this.init = function(opts) {
 		opts.width = PLAYER_WIDTH;
@@ -107,6 +113,8 @@ exports = Class(View, function(supr) {
 			blockInterrupts: true
 		};
 
+		model = this.model = {};
+
 		this.designView();
 		this.reset();
 	};
@@ -125,59 +133,56 @@ exports = Class(View, function(supr) {
 			canHandleEvents: false
 		});
 
-		this.boundAllowGravity = bind(this, function() {
-			this.ignoreGravity = false;
-		});
+		// prepare animations
+		this.xAnim = animate(model, 'x');
+		this.yAnim = animate(model, 'y');
+		this.vxAnim = animate(model, 'vx');
+		this.vyAnim = animate(model, 'vy');
+		this.axAnim = animate(model, 'ax');
+		this.ayAnim = animate(model, 'ay');
+		this.jumpAnim = animate(this.sprite, 'jump');
+		this.rushAnim = animate(this.sprite, 'rush');
 
-		this.boundFinishFlip = bind(this, function() {
-			this.sprite.style.r = 0;
-			!this.hasRushed && (this.animating = false);
-			this.flipping = false;
-		});
-
-		this.boundFinishRush = bind(this, function() {
-			this.sprite.style.r = 0;
-			!this.flipping && (this.animating = false);
-			this.hasRushed = false;
-			this.ignoreGravity = false;
-			this.ignoreTargetX = false;
-			this.stopHorz();
-			this.targetX = this.x;
-		});
+		// pre-bound functions as callbacks
+		boundFinishJump = bind(this, 'finishJump');
+		boundFinishFlip = bind(this, 'finishFlip');
+		boundFinishRush = bind(this, 'finishRush');
 	};
 
 	this.reset = function() {
-		this.style.x = this.x = this.targetX = (BG_WIDTH - PLAYER_WIDTH) / 2;
-		this.style.y = this.y = (BG_HEIGHT - PLAYER_HEIGHT) / 2;
-		this.width = this.style.width;
-		this.height = this.style.height;
-		this.v = { x: 0, y: 0 };
-		this.a = { x: 0, y: 0 };
-		this.targetX = BG_WIDTH / 2;
-		this.targetAX = 0;
-		this.vxAnim = animate(this.v, 'vx');
-		this.vyAnim = animate(this.v, 'vy');
-		this.axAnim = animate(this.a, 'ax');
-		this.ayAnim = animate(this.a, 'ay');
-		this.jumpAnim = animate(this.sprite, 'jump');
-		this.rushAnim = animate(this.sprite, 'rush');
-		this.ignoreGravity = false;
-		this.ignoreTargetX = false;
+		var style = this.style;
+		model.x = style.x = (BG_WIDTH - PLAYER_WIDTH) / 2;
+		model.y = style.y = (BG_HEIGHT - PLAYER_HEIGHT) / 2;
+		model.width = style.width;
+		model.height = style.height;
+		model.vx = 0;
+		model.vy = 0;
+		model.ax = 0;
+		model.ay = 0;
+		model.tx = BG_WIDTH / 2;
+		model.ty = 0;
+		model.tvx = 0;
+		model.tvy = 0;
+		model.tax = 0;
+		model.tay = 0;
+
+		this.ignoreVert = false;
+		this.ignoreHorz = false;
 		this.hasLanded = false;
 		this.hasJumped = false;
 		this.hasDoubleJumped = false;
 		this.hasRushed = false;
 		this.falling = false;
 		this.flipping = false;
-		this.setState(STATE_DEFAULT);
+		this.setState(STATE_DEFAULT, true);
 	};
 
 	this.setState = function(state, force) {
 		if (force || (!this.animating && this.state !== state)) {
+			var stateData = STATES[state];
 			this.state = state;
-			this.stateData = STATES[state];
-			this.sprite.startAnimation(this.stateData.action, this.stateData.opts);
-			this.stateData.blockInterrupts && (this.animating = true);
+			this.sprite.startAnimation(stateData.action, stateData.opts);
+			stateData.blockInterrupts && (this.animating = true);
 		}
 	};
 
@@ -191,18 +196,28 @@ exports = Class(View, function(supr) {
 		}
 
 		this.setState(STATE_JUMPING, true);
-		this.ignoreGravity = true;
+		this.ignoreVert = true;
 		this.flipping = true;
-		this.a.y > 0 && (this.a.y = 0);
+		model.ay > 0 && (model.ay = 0);
 		this.sprite.style.r = 0;
 
-		this.ayAnim.now({ y: JUMP_ACCEL }, JUMP_ACCEL_TIME / 2, animate.easeOut)
-		.then({ y: 0 }, JUMP_ACCEL_TIME / 2, animate.easeOut)
-		.then(this.boundAllowGravity);
+		this.ayAnim.now({ ay: JUMP_ACCEL }, JUMP_ACCEL_TIME / 2, animate.easeOut)
+		.then({ ay: 0 }, JUMP_ACCEL_TIME / 2, animate.easeOut)
+		.then(boundFinishJump);
 
 		this.jumpAnim.now({ r: JUMP_ROT }, JUMP_ROT_TIME, animate.easeIn)
 		.then({ r: 2 * JUMP_ROT }, JUMP_ROT_TIME, animate.easeOut)
-		.then(this.boundFinishFlip);
+		.then(boundFinishFlip);
+	};
+
+	this.finishJump = function() {
+		this.ignoreVert = false;
+	};
+
+	this.finishFlip = function() {
+		this.sprite.style.r = 0;
+		this.flipping = false;
+		!this.hasRushed && (this.animating = false);
 	};
 
 	this.rush = function(dx) {
@@ -213,29 +228,37 @@ exports = Class(View, function(supr) {
 		}
 
 		this.setState(STATE_RUSHING, true);
-		this.ignoreGravity = true;
-		this.ignoreTargetX = true;
+		this.ignoreVert = true;
+		this.ignoreHorz = true;
 
 		this.stopHorz();
 		this.jumpAnim.commit();
 
-		var v = this.v,
-			a = this.a,
-			runSign = dx >= 0 ? 1 : -1,
-			dest = min(RIGHT_WALL_SLIDE_X, max(LEFT_WALL_SLIDE_X, this.x + runSign * RUSH_DISTANCE));
+		var runSign = dx >= 0 ? 1 : -1,
+			dest = min(RIGHT_WALL_SLIDE_X, max(LEFT_WALL_SLIDE_X, model.x + runSign * RUSH_DISTANCE)),
+			dxReal = dest - model.x,
+			rushTime = RUSH_TIME * abs(dxReal) / RUSH_DISTANCE;
 
-		dx = dest - this.x;
-		var rushTime = RUSH_TIME * abs(dx) / RUSH_DISTANCE;
-		v.x = dx / rushTime;
+		model.vx = dxReal / rushTime;
 
 		this.rushAnim.wait(rushTime)
-		.then(this.boundFinishRush);
+		.then(boundFinishRush);
 
-		if (dx < 0 && !this.flippedX) {
+		if (dxReal < 0 && !this.flippedX) {
 			this.flippedX = this.style.flipX = true;
-		} else if (dx > 0 && this.flippedX) {
+		} else if (dxReal > 0 && this.flippedX) {
 			this.flippedX = this.style.flipX = false;
 		}
+	};
+
+	this.finishRush = function() {
+		this.sprite.style.r = 0;
+		!this.flipping && (this.animating = false);
+		this.hasRushed = false;
+		this.ignoreVert = false;
+		this.ignoreHorz = false;
+		this.stopHorz();
+		this.setTargetX(model.x);
 	};
 
 	this.finishLanding = function() {
@@ -244,42 +267,42 @@ exports = Class(View, function(supr) {
 	};
 
 	this.setTargetX = function(x) {
-		this.targetX = x;
+		// "sticky" walls pull you into wall-sliding
+		if (x <= LEFT_WALL_X) {
+			x = LEFT_WALL_SLIDE_X;
+		} else if (x >= RIGHT_WALL_X) {
+			x = RIGHT_WALL_SLIDE_X;
+		}
+
+		model.tx = x;
 	};
 
 	this.stopHorz = function() {
+		this.xAnim.clear();
 		this.vxAnim.clear();
 		this.axAnim.clear();
-		this.v.x = 0;
-		this.a.x = 0;
-		this.targetAX = 0;
+		model.vx = 0;
+		model.ax = 0;
+		model.tvx = 0;
+		model.tax = 0;
 	};
 
 	this.step = function(dt) {
 		// player movement vars and useful refs
-		var startX = this.x,
-			startY = this.y,
-			dx = this.targetX - startX,
+		var startX = model.x,
+			startY = model.y,
+			dx = model.tx - startX,
 			runSign = dx >= 0 ? 1 : -1,
 			runSpeedMaxSigned = runSign * RUN_SPEED_MAX,
 			runAccelMaxSigned = runSign * RUN_ACCEL_MAX,
-			v = this.v,
-			a = this.a,
 			runSpeedMult = 1,
 			fallResistance = AIR_RESISTANCE,
 			style = this.style,
 			spriteStyle = this.sprite.style;
 
 		// slow down closer to target (faux-deceleration)
-		if (dx && abs(dx) < RUN_DECEL_RANGE && !this.ignoreTargetX) {
+		if (dx && abs(dx) < RUN_DECEL_RANGE && !this.ignoreHorz) {
 			runSpeedMult = RUN_DECEL_MIN + (1 - RUN_DECEL_MIN) * pow(dx / RUN_DECEL_RANGE, 2);
-		}
-
-		// "sticky" walls pull you into wall-sliding
-		if (this.targetX <= LEFT_WALL_X) {
-			this.targetX = LEFT_WALL_SLIDE_X;
-		} else if (this.targetX >= RIGHT_WALL_X) {
-			this.targetX = RIGHT_WALL_SLIDE_X;
 		}
 
 		// flip player horizontally based on direction of movement and wall slide state
@@ -287,12 +310,12 @@ exports = Class(View, function(supr) {
 			fallResistance = WALL_RESISTANCE;
 
 			// force opposite flip on walls
-			if (!this.flippedX && this.x >= RIGHT_WALL_X) {
+			if (!this.flippedX && model.x >= RIGHT_WALL_X) {
 				this.flippedX = style.flipX = true;
-			} else if (this.flippedX && this.x <= LEFT_WALL_X) {
+			} else if (this.flippedX && model.x <= LEFT_WALL_X) {
 				this.flippedX = style.flipX = false;
 			}
-		} else if (!this.ignoreTargetX) {
+		} else if (!this.ignoreHorz) {
 			if (dx < 0 && !this.flippedX) {
 				this.flippedX = style.flipX = true;
 			} else if (dx > 0 && this.flippedX) {
@@ -305,51 +328,51 @@ exports = Class(View, function(supr) {
 		 */
 
 		// horizontal movement
-		this.x += dt * runSpeedMult * v.x / 2;
-		v.x += dt * a.x;
-		if (abs(v.x) > RUN_SPEED_MAX && !this.ignoreTargetX) {
-			v.x = runSpeedMaxSigned;
+		model.x += dt * runSpeedMult * model.vx / 2;
+		model.vx += dt * model.ax;
+		if (abs(model.vx) > RUN_SPEED_MAX && !this.ignoreHorz) {
+			model.vx = runSpeedMaxSigned;
 		}
-		this.x += dt * runSpeedMult * v.x / 2;
+		model.x += dt * runSpeedMult * model.vx / 2;
 
-		if (!this.ignoreTargetX || this.x <= LEFT_WALL_SLIDE_X || this.x >= RIGHT_WALL_SLIDE_X) {
-			// determine when the target x has been reached or passed
-			if ((startX < this.targetX && this.x >= this.targetX)
-				|| (startX > this.targetX && this.x <= this.targetX))
-			{
-				this.stopHorz();
-				this.x = this.targetX;
-			}
+		// determine when target x or wall boundaries have been passed
+		if (!this.ignoreHorz
+			&& ((startX < model.tx && model.x >= model.tx) || (startX > model.tx && model.x <= model.tx)))
+		{
+			this.stopHorz();
+			model.x = model.tx;
+		} else if (model.x < LEFT_WALL_SLIDE_X) {
+			model.x = LEFT_WALL_SLIDE_X;
+		} else if (model.x > RIGHT_WALL_SLIDE_X) {
+			model.x = RIGHT_WALL_SLIDE_X;
 		}
 
-		if (!this.ignoreTargetX) {
-			// animate horizontal acceleration for realistic player movement
-			if (this.x !== this.targetX
-				&& v.x !== runSpeedMaxSigned
-				&& this.targetAX !== runAccelMaxSigned)
-			{
-				this.targetAX = runAccelMaxSigned;
-				this.axAnim.now({ x: runAccelMaxSigned }, RUN_ACCEL_TIME, animate.linear);
-			}
+		// animate horizontal acceleration for realistic player movement
+		if (!this.ignoreHorz
+			&& model.x !== model.tx
+			&& model.vx !== runSpeedMaxSigned
+			&& model.tax !== runAccelMaxSigned)
+		{
+			model.tax = runAccelMaxSigned;
+			this.axAnim.now({ ax: runAccelMaxSigned }, RUN_ACCEL_TIME, animate.linear);
 		}
 
 		// vertical movement
-		var startY = this.y;
-		this.y += dt * v.y / 2;
-		v.y += dt * a.y / 2;
-		!this.ignoreGravity && (a.y = GRAVITY - v.y * fallResistance);
-		v.y += dt * a.y / 2;
-		this.y += dt * v.y / 2;
+		model.y += dt * model.vy / 2;
+		model.vy += dt * model.ay / 2;
+		!this.ignoreVert && (model.ay = GRAVITY - model.vy * fallResistance);
+		model.vy += dt * model.ay / 2;
+		model.y += dt * model.vy / 2;
 
 		// state helper flags
 		this.hasLanded = this.checkPlatformCollision(startY);
-		this.falling = !this.hasLanded && v.y > 0;
+		this.falling = !this.hasLanded && model.vy > 0;
 
 		// state update checks
 		if (this.falling) {
-			if (!this.ignoreGravity
-				&& !this.ignoreTargetX
-				&& (this.x <= WALL_WIDTH || this.x >= BG_WIDTH - WALL_WIDTH))
+			if (!this.ignoreVert
+				&& !this.ignoreHorz
+				&& (model.x <= WALL_WIDTH || model.x >= BG_WIDTH - WALL_WIDTH))
 			{
 				this.setState(STATE_WALL_SLIDING);
 				this.hasJumped = false;
@@ -363,15 +386,13 @@ exports = Class(View, function(supr) {
 		}
 
 		// update styles
-		style.x = this.x - this.width / 2;
-		// TODO: style.y change to create camera look ahead based on player vertical speed
-
+		style.x = model.x - model.width / 2;
 		// special rushing rotation
 		if (this.hasRushed) {
-			spriteStyle.r = runSign * atan(v.y / v.x);
+			spriteStyle.r = runSign * atan(model.vy / model.vx);
 		}
 
-		return this.y;
+		return model.y;
 	};
 
 	this.checkPlatformCollision = function(startY) {
@@ -381,16 +402,16 @@ exports = Class(View, function(supr) {
 			var platX = platform.style.x + platform.hitX;
 			var platY = platform.style.y + platform.hitY - this.style.y;
 			var platEndX = platX + platform.hitWidth;
-			if (startY + PLAYER_FEET <= platY && this.y + PLAYER_FEET >= platY) {
-				if (this.x >= platX && this.x <= platEndX) {
+			if (startY + PLAYER_FEET <= platY && model.y + PLAYER_FEET >= platY) {
+				if (model.x >= platX && model.x <= platEndX) {
 					// player landing
 					if (this.state === STATE_FALLING || this.state === STATE_WALL_SLIDING) {
 						this.setState(STATE_LANDING);
 					}
 
-					this.y = platY - PLAYER_FEET;
-					this.v.y = 0;
-					this.a.y = 0;
+					model.y = platY - PLAYER_FEET;
+					model.vy = 0;
+					model.ay = 0;
 					this.hasJumped = false;
 					this.hasDoubleJumped = false;
 					return true;
