@@ -331,6 +331,7 @@ exports = Class(View, function(supr) {
 
 	this.finishLanding = function() {
 		this.animating = false;
+		this.flipping = false;
 		this.setState(STATE_IDLE);
 	};
 
