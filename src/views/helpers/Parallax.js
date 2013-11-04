@@ -53,7 +53,7 @@ var parallaxConfig = [
 	},
 	{
 		name: "lax_3",
-		speed: 0.55,
+		speed: 0.30,
 		zIndex: 50,
 		pieces: [
 			{
