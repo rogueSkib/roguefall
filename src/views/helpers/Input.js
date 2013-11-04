@@ -17,7 +17,9 @@ exports = Class(View, function(supr) {
 	var JUMP_PX_PER_MS = -1,
 		JUMP_PX_MIN = -40,
 		RUSH_PX_PER_MS = 2,
-		RUSH_PX_MIN = 120;
+		RUSH_PX_MIN = 120,
+		DIVE_PX_PER_MS = 1,
+		DIVE_PX_MIN = 40;
 
 	var gameView;
 
@@ -30,6 +32,7 @@ exports = Class(View, function(supr) {
 		this.movedThisStep = false;
 		this.hasJumped = false;
 		this.hasRushed = false;
+		this.hasDived = false;
 	};
 
 	this.onInputStart = function(evt, pt) {
@@ -71,6 +74,16 @@ exports = Class(View, function(supr) {
 				gameView.player.rush(dx);
 				this.hasRushed = true;
 			}
+
+			// dive check
+			if (!this.hasDived
+				&& dy > DIVE_PX_MIN
+				&& elapsed
+				&& dy / elapsed >= DIVE_PX_PER_MS)
+			{
+				gameView.player.dive();
+				this.hasDived = true;
+			}
 		}
 	};
 
@@ -80,6 +93,7 @@ exports = Class(View, function(supr) {
 			this.inputStartPt = null;
 			this.hasJumped = false;
 			this.hasRushed = false;
+			this.hasDived = false;
 		}
 	};
 

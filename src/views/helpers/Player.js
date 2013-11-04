@@ -27,6 +27,7 @@ exports = Class(View, function(supr) {
 		RUSH_DISTANCE,
 		DEFAULT_Y,
 		RUSH_TIME = 325,
+		DIVE_TIME = 650,
 		PLAYER_WIDTH = 164,
 		PLAYER_HEIGHT = 164,
 		PLAYER_FEET = 154,
@@ -39,6 +40,7 @@ exports = Class(View, function(supr) {
 		JUMP_ROT = 2 * PI,
 		JUMP_ROT_TIME = 250,
 		FALL_SPEED_MAX = GRAVITY / AIR_RESISTANCE,
+		DIVE_SPEED = 2.5 * FALL_SPEED_MAX,
 		RUN_SPEED_MAX = 0.9,
 		RUN_ACCEL_MAX = 0.009,
 		RUN_ACCEL_TIME = 150,
@@ -55,6 +57,7 @@ exports = Class(View, function(supr) {
 		STATE_LANDING = 4,
 		STATE_WALL_SLIDING = 5,
 		STATE_JUMPING = 6,
+		STATE_DIVING = 7,
 		STATE_DEFAULT = STATE_IDLE;
 
 	var PLAYER_URL = "resources/images/game/rogue/rogue";
@@ -62,7 +65,8 @@ exports = Class(View, function(supr) {
 	// bound callback functions
 	var boundFinishJump,
 		boundFinishFlip,
-		boundFinishRush;
+		boundFinishRush,
+		boundFinishDive;
 
 	this.init = function(opts) {
 		opts.width = PLAYER_WIDTH;
@@ -116,6 +120,11 @@ exports = Class(View, function(supr) {
 			opts: { iterations: Infinity },
 			blockInterrupts: true
 		};
+		STATES[STATE_DIVING] = {
+			action: "dive",
+			opts: { iterations: Infinity },
+			blockInterrupts: true
+		};
 
 		model = this.model = {};
 
@@ -151,6 +160,7 @@ exports = Class(View, function(supr) {
 		boundFinishJump = bind(this, 'finishJump');
 		boundFinishFlip = bind(this, 'finishFlip');
 		boundFinishRush = bind(this, 'finishRush');
+		boundFinishDive = bind(this, 'finishDive');
 	};
 
 	this.reset = function() {
@@ -181,6 +191,7 @@ exports = Class(View, function(supr) {
 		this.hasJumped = false;
 		this.hasDoubleJumped = false;
 		this.hasRushed = false;
+		this.hasDived = false;
 		this.falling = false;
 		this.flipping = false;
 
@@ -197,7 +208,9 @@ exports = Class(View, function(supr) {
 	};
 
 	this.jump = function() {
-		if (this.hasJumped && !this.hasDoubleJumped) {
+		if (this.state === STATE_DIVING) {
+			return;
+		} else if (this.hasJumped && !this.hasDoubleJumped) {
 			this.hasDoubleJumped = true;
 		} else if (!this.hasJumped) {
 			this.hasJumped = true
@@ -231,18 +244,18 @@ exports = Class(View, function(supr) {
 	};
 
 	this.rush = function(dx) {
-		if (!this.hasRushed) {
+		if (!this.hasRushed && !this.hasDived) {
 			this.hasRushed = true;
 		} else {
 			return;
 		}
 
+		this.flipping && this.jumpAnim.commit();
 		this.setState(STATE_RUSHING, true);
 		this.ignoreVert = true;
 		this.ignoreHorz = true;
 
 		this.stopHorz();
-		this.jumpAnim.commit();
 
 		var runSign = dx >= 0 ? 1 : -1,
 			dest = min(RIGHT_WALL_SLIDE_X, max(LEFT_WALL_SLIDE_X, model.x + runSign * RUSH_DISTANCE)),
@@ -269,6 +282,30 @@ exports = Class(View, function(supr) {
 		this.setTargetX(model.x);
 	};
 
+	this.dive = function() {
+		if (!this.hasDived && !this.hasLanded && !this.hasRushed) {
+			this.hasDived = true;
+		} else {
+			return;
+		}
+
+		this.flipping && this.jumpAnim.commit();
+		this.setState(STATE_DIVING, true);
+		this.ignoreVert = true;
+
+		var vy = model.vy;
+		this.stopVert();
+		model.vy = vy;
+
+		this.vyAnim.now({ vy: DIVE_SPEED }, DIVE_TIME, animate.easeOut)
+		.then(boundFinishDive);
+	};
+
+	this.finishDive = function() {
+		this.animating = false;
+		this.ignoreVert = false;
+	};
+
 	this.finishLanding = function() {
 		this.animating = false;
 		this.setState(STATE_IDLE);
@@ -293,6 +330,16 @@ exports = Class(View, function(supr) {
 		model.ax = 0;
 		model.tvx = 0;
 		model.tax = 0;
+	};
+
+	this.stopVert = function() {
+		this.yAnim.clear();
+		this.vyAnim.clear();
+		this.ayAnim.clear();
+		model.vy = 0;
+		model.ay = 0;
+		model.tvy = 0;
+		model.tay = 0;
 	};
 
 	this.step = function(dt) {
@@ -421,8 +468,16 @@ exports = Class(View, function(supr) {
 			if (startY + PLAYER_FEET <= platY && model.y + PLAYER_FEET >= platY) {
 				if (model.x >= platX && model.x <= platEndX) {
 					// player landing
-					if (this.state === STATE_FALLING || this.state === STATE_WALL_SLIDING) {
+					if (this.state === STATE_FALLING
+						|| this.state === STATE_WALL_SLIDING
+						|| this.state === STATE_DIVING)
+					{
 						this.setState(STATE_LANDING);
+					}
+
+					if (this.hasDived) {
+						this.stopVert();
+						this.finishDive();
 					}
 
 					model.y = platY - PLAYER_FEET;
@@ -430,6 +485,7 @@ exports = Class(View, function(supr) {
 					model.ay = 0;
 					this.hasJumped = false;
 					this.hasDoubleJumped = false;
+					this.hasDived = false;
 					return true;
 				}
 			}
