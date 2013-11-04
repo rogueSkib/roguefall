@@ -37,8 +37,8 @@ exports = Class(View, function(supr) {
 		WALL_WIDTH = 58,
 		JUMP_ACCEL = -0.02,
 		JUMP_ACCEL_TIME = 125,
-		JUMP_ROT = 2 * PI,
-		JUMP_ROT_TIME = 250,
+		JUMP_ROT = 6 * PI,
+		JUMP_ROT_TIME = 750,
 		FALL_SPEED_MAX = GRAVITY / AIR_RESISTANCE,
 		DIVE_SPEED = 2.5 * FALL_SPEED_MAX,
 		RUN_SPEED_MAX = 0.9,
@@ -66,7 +66,8 @@ exports = Class(View, function(supr) {
 	var boundFinishJump,
 		boundFinishFlip,
 		boundFinishRush,
-		boundFinishDive;
+		boundFinishDive,
+		boundDiveFromFlip;
 
 	this.init = function(opts) {
 		opts.width = PLAYER_WIDTH;
@@ -82,6 +83,7 @@ exports = Class(View, function(supr) {
 		RIGHT_WALL_X = BG_WIDTH - WALL_WIDTH;
 		RIGHT_WALL_SLIDE_X = BG_WIDTH - WALL_WIDTH / 2;
 		RUSH_DISTANCE = BG_WIDTH;
+		DEFAULT_X = (BG_WIDTH - PLAYER_WIDTH) / 2;
 		DEFAULT_Y = (BG_HEIGHT - PLAYER_HEIGHT) / 2;
 
 		this.FALL_SPEED_MAX = FALL_SPEED_MAX;
@@ -161,12 +163,13 @@ exports = Class(View, function(supr) {
 		boundFinishFlip = bind(this, 'finishFlip');
 		boundFinishRush = bind(this, 'finishRush');
 		boundFinishDive = bind(this, 'finishDive');
+		boundDiveFromFlip = bind(this, 'diveFromFlip');
 	};
 
 	this.reset = function() {
 		var style = this.style;
-		model.x = style.x = (BG_WIDTH - PLAYER_WIDTH) / 2;
-		model.y = style.y = (BG_HEIGHT - PLAYER_HEIGHT) / 2;
+		model.x = style.x = DEFAULT_X;
+		model.y = style.y = DEFAULT_Y;
 		model.width = style.width;
 		model.height = style.height;
 		// velocity and acceleration
@@ -175,7 +178,7 @@ exports = Class(View, function(supr) {
 		model.ax = 0;
 		model.ay = 0;
 		// target values
-		model.tx = BG_WIDTH / 2;
+		model.tx = model.x;
 		model.ty = 0;
 		model.tvx = 0;
 		model.tvy = 0;
@@ -228,8 +231,8 @@ exports = Class(View, function(supr) {
 		.then({ ay: 0 }, JUMP_ACCEL_TIME / 2, animate.easeOut)
 		.then(boundFinishJump);
 
-		this.jumpAnim.now({ r: JUMP_ROT }, JUMP_ROT_TIME, animate.easeIn)
-		.then({ r: 2 * JUMP_ROT }, JUMP_ROT_TIME, animate.easeOut)
+		this.jumpAnim.now({ r: JUMP_ROT / 3 }, JUMP_ROT_TIME / 3, animate.easeIn)
+		.then({ r: 2 * JUMP_ROT / 3 }, JUMP_ROT_TIME / 3, animate.easeOut)
 		.then(boundFinishFlip);
 	};
 
@@ -274,7 +277,7 @@ exports = Class(View, function(supr) {
 
 	this.finishRush = function() {
 		this.sprite.style.r = 0;
-		!this.flipping && (this.animating = false);
+		this.animating = false;
 		this.hasRushed = false;
 		this.ignoreVert = false;
 		this.ignoreHorz = false;
@@ -289,16 +292,36 @@ exports = Class(View, function(supr) {
 			return;
 		}
 
-		this.flipping && this.jumpAnim.commit();
-		this.setState(STATE_DIVING, true);
-		this.ignoreVert = true;
+		if (!this.flipping) {
+			this.flipping = true;
+			this.setState(STATE_JUMPING, true);
+			this.jumpAnim.now({ r: JUMP_ROT / 2 }, JUMP_ROT_TIME / 3, animate.easeOut)
+			.then(boundDiveFromFlip)
+			.wait(DIVE_TIME - JUMP_ROT_TIME / 3)
+			.then(boundFinishDive);
+		} else {
+			this.jumpAnim.commit();
+			this.setState(STATE_DIVING, true);
+		}
 
 		var vy = model.vy;
 		this.stopVert();
-		model.vy = vy;
+		model.vy = max(vy, DIVE_SPEED / 2);
+		this.ignoreVert = true;
 
 		this.vyAnim.now({ vy: DIVE_SPEED }, DIVE_TIME, animate.easeOut)
 		.then(boundFinishDive);
+	};
+
+	this.diveFromFlip = function() {
+		if (!this.hasLanded) {
+			this.setState(STATE_DIVING, true);
+		} else {
+			this.animating = false;
+		}
+
+		this.flipping = false;
+		this.sprite.style.r = 0;
 	};
 
 	this.finishDive = function() {
@@ -427,7 +450,7 @@ exports = Class(View, function(supr) {
 		if (this.falling) {
 			if (!this.ignoreVert
 				&& !this.ignoreHorz
-				&& (model.x <= WALL_WIDTH || model.x >= BG_WIDTH - WALL_WIDTH))
+				&& (model.x <= LEFT_WALL_X || model.x >= RIGHT_WALL_X))
 			{
 				this.setState(STATE_WALL_SLIDING);
 				this.hasJumped = false;
@@ -467,17 +490,20 @@ exports = Class(View, function(supr) {
 			var platEndX = platX + platform.hitWidth;
 			if (startY + PLAYER_FEET <= platY && model.y + PLAYER_FEET >= platY) {
 				if (model.x >= platX && model.x <= platEndX) {
+					// force dive finish
+					if (this.hasDived) {
+						this.jumpAnim.clear();
+						this.sprite.style.r = 0;
+						this.stopVert();
+						this.finishDive();
+					}
+
 					// player landing
 					if (this.state === STATE_FALLING
 						|| this.state === STATE_WALL_SLIDING
 						|| this.state === STATE_DIVING)
 					{
 						this.setState(STATE_LANDING);
-					}
-
-					if (this.hasDived) {
-						this.stopVert();
-						this.finishDive();
 					}
 
 					model.y = platY - PLAYER_FEET;
