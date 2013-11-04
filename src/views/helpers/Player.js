@@ -15,7 +15,6 @@ exports = Class(View, function(supr) {
 		pow = Math.pow,
 		PI = Math.PI;
 
-	// player constants
 	var controller,
 		gameView,
 		model,
@@ -26,6 +25,7 @@ exports = Class(View, function(supr) {
 		RIGHT_WALL_X,
 		RIGHT_WALL_SLIDE_X,
 		RUSH_DISTANCE,
+		DEFAULT_Y,
 		RUSH_TIME = 333,
 		PLAYER_WIDTH = 164,
 		PLAYER_HEIGHT = 164,
@@ -38,6 +38,7 @@ exports = Class(View, function(supr) {
 		JUMP_ACCEL_TIME = 125,
 		JUMP_ROT = 2 * PI,
 		JUMP_ROT_TIME = 250,
+		FALL_SPEED_MAX = GRAVITY / AIR_RESISTANCE,
 		RUN_SPEED_MAX = 0.9,
 		RUN_ACCEL_MAX = 0.009,
 		RUN_ACCEL_TIME = 150,
@@ -77,6 +78,9 @@ exports = Class(View, function(supr) {
 		RIGHT_WALL_X = BG_WIDTH - WALL_WIDTH;
 		RIGHT_WALL_SLIDE_X = BG_WIDTH - WALL_WIDTH / 2;
 		RUSH_DISTANCE = BG_WIDTH;
+		DEFAULT_Y = (BG_HEIGHT - PLAYER_HEIGHT) / 2;
+
+		this.FALL_SPEED_MAX = FALL_SPEED_MAX;
 
 		STATES[STATE_IDLE] = {
 			action: "idle",
@@ -155,10 +159,12 @@ exports = Class(View, function(supr) {
 		model.y = style.y = (BG_HEIGHT - PLAYER_HEIGHT) / 2;
 		model.width = style.width;
 		model.height = style.height;
+		// velocity and acceleration
 		model.vx = 0;
 		model.vy = 0;
 		model.ax = 0;
 		model.ay = 0;
+		// target values
 		model.tx = BG_WIDTH / 2;
 		model.ty = 0;
 		model.tvx = 0;
@@ -174,6 +180,7 @@ exports = Class(View, function(supr) {
 		this.hasRushed = false;
 		this.falling = false;
 		this.flipping = false;
+
 		this.setState(STATE_DEFAULT, true);
 	};
 
@@ -387,6 +394,7 @@ exports = Class(View, function(supr) {
 
 		// update styles
 		style.x = model.x - model.width / 2;
+		style.y = DEFAULT_Y + gameView.cameraY;
 		// special rushing rotation
 		if (this.hasRushed) {
 			spriteStyle.r = runSign * atan(model.vy / model.vx);
@@ -400,7 +408,7 @@ exports = Class(View, function(supr) {
 		for (var p = 0; p < platforms.length; p++) {
 			var platform = platforms[p];
 			var platX = platform.style.x + platform.hitX;
-			var platY = platform.style.y + platform.hitY - this.style.y;
+			var platY = platform.style.y + platform.hitY - DEFAULT_Y;
 			var platEndX = platX + platform.hitWidth;
 			if (startY + PLAYER_FEET <= platY && model.y + PLAYER_FEET >= platY) {
 				if (model.x >= platX && model.x <= platEndX) {

@@ -2,6 +2,7 @@ import ui.View as View;
 import ui.ImageView as ImageView;
 
 import src.models.AppTick as AppTick;
+import src.models.Camera as Camera;
 
 import src.views.helpers.Parallax as Parallax;
 import src.views.helpers.Platforms as Platforms;
@@ -66,6 +67,16 @@ exports = Class(View, function(supr) {
 			width: BG_WIDTH,
 			height: BG_HEIGHT
 		});
+
+		this.camera = new Camera({
+			gameView: this,
+			panningBounds: {
+				minX: 0,
+				maxX: 0,
+				minY: -0.35 * this.style.height,
+				maxY: 0.35 * this.style.height
+			}
+		});
 	};
 
 	this.resetView = function() {
@@ -74,14 +85,16 @@ exports = Class(View, function(supr) {
 		this.player.reset();
 
 		this.offsetY = 0;
+		this.cameraY = 0;
 	};
 
 	this.constructView = function() {};
 	this.deconstructView = function(callback) { callback && callback(); };
 
 	this.tick = function(dt) {
-		// step the player first, the others rely on offsetY
-		this.offsetY = this.player.step(dt);
+		// step the player and camera first, the others rely on their offsets
+		this.cameraY = this.camera.step(dt);
+		this.offsetY = this.player.step(dt) - this.cameraY;
 
 		this.platforms.step(dt);
 		this.parallax.step(dt);
