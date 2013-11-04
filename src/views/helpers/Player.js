@@ -26,7 +26,7 @@ exports = Class(View, function(supr) {
 		RIGHT_WALL_SLIDE_X,
 		RUSH_DISTANCE,
 		DEFAULT_Y,
-		RUSH_TIME = 333,
+		RUSH_TIME = 325,
 		PLAYER_WIDTH = 164,
 		PLAYER_HEIGHT = 164,
 		PLAYER_FEET = 154,
@@ -171,6 +171,9 @@ exports = Class(View, function(supr) {
 		model.tvy = 0;
 		model.tax = 0;
 		model.tay = 0;
+		// last values (previous tick)
+		model.lx = model.x;
+		model.ly = model.y;
 
 		this.ignoreVert = false;
 		this.ignoreHorz = false;
@@ -246,9 +249,7 @@ exports = Class(View, function(supr) {
 			dxReal = dest - model.x,
 			rushTime = RUSH_TIME * abs(dxReal) / RUSH_DISTANCE;
 
-		model.vx = dxReal / rushTime;
-
-		this.rushAnim.wait(rushTime)
+		this.xAnim.now({ x: dest }, rushTime, animate.easeOut)
 		.then(boundFinishRush);
 
 		if (dxReal < 0 && !this.flippedX) {
@@ -397,8 +398,15 @@ exports = Class(View, function(supr) {
 		style.y = DEFAULT_Y + gameView.cameraY;
 		// special rushing rotation
 		if (this.hasRushed) {
-			spriteStyle.r = runSign * atan(model.vy / model.vx);
+			var ldx = model.x - model.lx,
+				ldy = model.y - model.ly,
+				lsign = ldx >= 0 ? 1 : -1,
+				tr = ldx !== 0 ? lsign * atan(ldy / ldx) : 0;
+			spriteStyle.r = (8 * spriteStyle.r + tr) / 9;
 		}
+
+		model.lx = model.x;
+		model.ly = model.y;
 
 		return model.y;
 	};

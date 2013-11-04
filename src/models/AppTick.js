@@ -19,6 +19,8 @@ exports = Class(Emitter, function (supr) {
 		MAX_TICK = 100,
 		TICK_MOD = 500;
 
+	var timeMult = 1;
+
 	this.init = function (opts) {
 		supr(this, 'init', [opts]);
 
@@ -46,8 +48,12 @@ exports = Class(Emitter, function (supr) {
 				sum += history[i];
 			}
 			dt = ~~(sum / count) || MIN_TICK;
-			origTick.call(timer, dt);
+			origTick.call(timer, dt * timeMult);
 		};
+	};
+
+	this.setTimeMultiplier = function(mult) {
+		timeMult = mult;
 	};
 
 	var dtHistory = [],

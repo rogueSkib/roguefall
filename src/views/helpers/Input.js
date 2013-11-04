@@ -17,7 +17,7 @@ exports = Class(View, function(supr) {
 	var JUMP_PX_PER_MS = -1,
 		JUMP_PX_MIN = -40,
 		RUSH_PX_PER_MS = 2,
-		RUSH_PX_MIN = 160;
+		RUSH_PX_MIN = 120;
 
 	var gameView;
 
