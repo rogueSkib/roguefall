@@ -465,7 +465,7 @@ exports = Class(View, function(supr) {
 		}
 
 		// update styles
-		style.x = model.x - model.width / 2;
+		style.x = model.x - PLAYER_WIDTH / 2;
 		style.y = DEFAULT_Y + gameView.cameraY;
 		// special rushing rotation
 		if (this.hasRushed) {

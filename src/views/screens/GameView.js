@@ -9,6 +9,8 @@ import src.views.helpers.Platforms as Platforms;
 import src.views.helpers.Player as Player;
 import src.views.helpers.Input as Input;
 
+import src.views.helpers.Spherebot as Spherebot;
+
 exports = Class(View, function(supr) {
 
 	var controller,
@@ -60,12 +62,10 @@ exports = Class(View, function(supr) {
 			zIndex: 100
 		});
 
-		this.input = new Input({
-			parent: this,
-			x: (this.style.width - BG_WIDTH) / 2,
-			y: (this.style.height - BG_HEIGHT) / 2,
-			width: BG_WIDTH,
-			height: BG_HEIGHT
+		this.sphereBot = new Spherebot({
+			parent: this.rootView,
+			gameView: this,
+			zIndex: 100
 		});
 
 		this.camera = new Camera({
@@ -76,6 +76,14 @@ exports = Class(View, function(supr) {
 				minY: -0.35 * this.style.height,
 				maxY: 0.35 * this.style.height
 			}
+		});
+
+		this.input = new Input({
+			parent: this,
+			x: (this.style.width - BG_WIDTH) / 2,
+			y: (this.style.height - BG_HEIGHT) / 2,
+			width: BG_WIDTH,
+			height: BG_HEIGHT
 		});
 	};
 
@@ -99,5 +107,7 @@ exports = Class(View, function(supr) {
 		this.platforms.step(dt);
 		this.parallax.step(dt);
 		this.input.step(dt);
+
+		this.sphereBot.step(dt);
 	};
 });
