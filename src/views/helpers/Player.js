@@ -46,7 +46,14 @@ exports = Class(View, function(supr) {
 		RUN_ACCEL_TIME = 150,
 		RUN_DECEL_RANGE = 120,
 		RUN_DECEL_MIN = 0.1,
-		RUN_DECEL_SLIDE = 2.5 * RUN_DECEL_MIN;
+		RUN_DECEL_SLIDE = 2.5 * RUN_DECEL_MIN,
+		BASE_HEALTH = 100,
+		HEALTH_REGEN = 1,
+		BASE_ENERGY = 100,
+		ENERGY_REGEN = 10,
+		JUMP_ENERGY = 10,
+		RUSH_ENERGY = 15,
+		DIVE_ENERGY = 20;
 
 	// player states
 	var STATES = {},
@@ -187,6 +194,11 @@ exports = Class(View, function(supr) {
 		// last values (previous tick)
 		model.lx = model.x;
 		model.ly = model.y;
+		// status
+		model.health = BASE_HEALTH;
+		model.healthMax = model.health;
+		model.energy = BASE_ENERGY;
+		model.energyMax = model.energy;
 
 		this.ignoreVert = false;
 		this.ignoreHorz = false;
@@ -211,7 +223,7 @@ exports = Class(View, function(supr) {
 	};
 
 	this.jump = function() {
-		if (this.state === STATE_DIVING) {
+		if (this.state === STATE_DIVING || model.energy < JUMP_ENERGY) {
 			return;
 		} else if (this.hasJumped && !this.hasDoubleJumped) {
 			this.hasDoubleJumped = true;
@@ -221,6 +233,7 @@ exports = Class(View, function(supr) {
 			return;
 		}
 
+		model.energy -= JUMP_ENERGY;
 		this.setState(STATE_JUMPING, true);
 		this.ignoreVert = true;
 		this.flipping = true;
@@ -247,12 +260,15 @@ exports = Class(View, function(supr) {
 	};
 
 	this.rush = function(dx) {
-		if (!this.hasRushed && !this.hasDived) {
+		if (model.energy < RUSH_ENERGY) {
+			return;
+		} else if (!this.hasRushed && !this.hasDived) {
 			this.hasRushed = true;
 		} else {
 			return;
 		}
 
+		model.energy -= RUSH_ENERGY;
 		this.flipping && this.jumpAnim.commit();
 		this.setState(STATE_RUSHING, true);
 		this.ignoreVert = true;
@@ -286,11 +302,15 @@ exports = Class(View, function(supr) {
 	};
 
 	this.dive = function() {
-		if (!this.hasDived && !this.hasLanded && !this.hasRushed) {
+		if (model.energy < DIVE_ENERGY) {
+			return;
+		} else if (!this.hasDived && !this.hasLanded && !this.hasRushed) {
 			this.hasDived = true;
 		} else {
 			return;
 		}
+
+		model.energy -= DIVE_ENERGY;
 
 		if (!this.flipping) {
 			this.flipping = true;
@@ -370,6 +390,7 @@ exports = Class(View, function(supr) {
 		// player movement vars and useful refs
 		var startX = model.x,
 			startY = model.y,
+			dtpct = dt / 1000,
 			dx = model.tx - startX,
 			runSign = dx >= 0 ? 1 : -1,
 			runSpeedMaxSigned = runSign * RUN_SPEED_MAX,
@@ -462,6 +483,24 @@ exports = Class(View, function(supr) {
 			this.setState(STATE_IDLE);
 		} else if (this.hasLanded) {
 			this.setState(STATE_RUNNING);
+		}
+
+		// health regeneration each tick
+		if (model.health < model.healthMax) {
+			model.health += HEALTH_REGEN * dtpct;
+			if (model.health > model.healthMax) {
+				model.health = model.healthMax;
+			}
+			gameView.statusBars.setHealthPercent(model.health / model.healthMax);
+		}
+
+		// energy regeneration each tick
+		if (model.energy < model.energyMax) {
+			model.energy += ENERGY_REGEN * dtpct;
+			if (model.energy > model.energyMax) {
+				model.energy = model.energyMax;
+			}
+			gameView.statusBars.setEnergyPercent(model.energy / model.energyMax);
 		}
 
 		// update styles

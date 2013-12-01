@@ -8,6 +8,7 @@ import src.views.helpers.Parallax as Parallax;
 import src.views.helpers.Platforms as Platforms;
 import src.views.helpers.Player as Player;
 import src.views.helpers.Input as Input;
+import src.views.helpers.StatusBars as StatusBars;
 
 import src.views.helpers.Spherebot as Spherebot;
 
@@ -71,17 +72,25 @@ exports = Class(View, function(supr) {
 		this.camera = new Camera({
 			gameView: this,
 			panningBounds: {
-				minX: 0,
-				maxX: 0,
 				minY: -0.35 * this.style.height,
 				maxY: 0.35 * this.style.height
 			}
+		});
+
+		this.statusBars = new StatusBars({
+			parent: this.rootView,
+			x: -this.rootView.style.x,
+			y: -this.rootView.style.y,
+			zIndex: 1000,
+			canHandleEvents: false,
+			blockEvents: true
 		});
 
 		this.input = new Input({
 			parent: this,
 			x: (this.style.width - BG_WIDTH) / 2,
 			y: (this.style.height - BG_HEIGHT) / 2,
+			zIndex: 10000,
 			width: BG_WIDTH,
 			height: BG_HEIGHT
 		});
@@ -106,6 +115,7 @@ exports = Class(View, function(supr) {
 
 		this.platforms.step(dt);
 		this.parallax.step(dt);
+		this.statusBars.step(dt);
 		this.input.step(dt);
 
 		this.sphereBot.step(dt);
