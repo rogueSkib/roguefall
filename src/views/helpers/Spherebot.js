@@ -1,5 +1,6 @@
 import animate;
 import ui.View as View;
+import ui.ImageView as ImageView;
 import ui.SpriteView as SpriteView;
 
 exports = Class(View, function(supr) {
@@ -11,8 +12,10 @@ exports = Class(View, function(supr) {
 		sin = Math.sin,
 		cos = Math.cos,
 		atan = Math.atan,
+		atan2 = Math.atan2,
 		abs = Math.abs,
 		pow = Math.pow,
+		sqrt = Math.sqrt,
 		PI = Math.PI;
 
 	var controller,
@@ -22,10 +25,17 @@ exports = Class(View, function(supr) {
 		SPHERE_ANCHOR_X = 58,
 		SPHERE_ANCHOR_Y = 47,
 		SPHERE_OFFSET_R = 0.7333,
-		BOT_FEET_Y = 95;
+		BOT_FEET_Y = 95,
+		ATTACK_COOLDOWN = 3000,
+		ATTACK_RANGE = 600,
+		ATTACK_RANGE_SQRD = pow(ATTACK_RANGE, 2),
+		ATTACK_X = 39,
+		ATTACK_Y = 25,
+		BARREL_RADIUS = sqrt(pow(ATTACK_X - SPHERE_ANCHOR_X, 2) + pow(ATTACK_Y - SPHERE_ANCHOR_Y, 2));
 
 	var SPHEREBOT_URL = "resources/images/game/spherebot/spherebot",
-		SPHERE_URL = "resources/images/game/spherebot/sphere";
+		SPHERE_URL = "resources/images/game/spherebot/sphere",
+		PROJECTILE_POOL = "LaserPool";
 
 	this.init = function(opts) {
 		opts.x = 0;
@@ -80,35 +90,30 @@ exports = Class(View, function(supr) {
 		model.y = 0;
 		model.r = 0;
 		model.tr = 0;
+		model.attackCooldown = ATTACK_COOLDOWN;
 
 		this.sphereSprite.startAnimation('idle');
 		this.botSprite.startAnimation('idle');
 	};
 
-/*	this.getLineView = function(parent, x1, y1, x2, y2, lineThickness) {
-		lineThickness = lineThickness || 4;
+	this.fireLaser = function() {
+		var style = this.style,
+			sphereStyle = this.sphereSprite.style,
+			offy = gameView.offsetY,
+			cosTheta = cos(sphereStyle.r - SPHERE_OFFSET_R - PI / 2),
+			sinTheta = sin(sphereStyle.r - SPHERE_OFFSET_R - PI / 2),
+			x1 = style.x + SPHERE_ANCHOR_X + BARREL_RADIUS * cosTheta,
+			y1 = style.y + offy + SPHERE_ANCHOR_Y + BARREL_RADIUS * sinTheta,
+			x2 = style.x + SPHERE_ANCHOR_X + 2 * ATTACK_RANGE * cosTheta,
+			y2 = style.y + offy + SPHERE_ANCHOR_Y + 2 * ATTACK_RANGE * sinTheta;
 
-		var dx = x2 - x1,
-			dy = y2 - y1,
-			lineLength = Math.sqrt((dx * dx) + (dy * dy));
-
-		return new ImageView({
-			superview: parent,
-			x: x1 + (dx - lineLength) / 2,
-			y: y1 + (dy - lineThickness) / 2,
-			r: dx ? Math.atan(dy / dx) : -Math.PI / 2,
-			anchorX: lineLength / 2,
-			anchorY: lineThickness / 2,
-			width: lineLength,
-			height: lineThickness,
-			image: "resources/images/game/grid_color.png",
-			canHandleEvents: false
-		});
+		var laser = gameView.obtainProjectile(PROJECTILE_POOL);
+		laser.fire(x1, y1, x2, y2);
+		this.sphereSprite.startAnimation('shoot');
 	};
-*/
 
 	this.step = function(dt) {
-		var playerModel = gameView.player.model,
+		var playerStyle = gameView.player.style,
 			model = this.model,
 			style = this.style,
 			sphereStyle = this.sphereSprite.style,
@@ -122,15 +127,29 @@ exports = Class(View, function(supr) {
 			model.y = plat.style.y + plat.hitY - BOT_FEET_Y + SPHEREBOT_HEIGHT / 2;
 		} else {
 			// update aim to face player
-			var cx = model.x + SPHERE_ANCHOR_X,
-				cy = model.y + SPHERE_ANCHOR_Y,
-				pdx = playerModel.x - cx,
-				pdy = playerModel.y - cy;
+			var cx = this.style.x + SPHERE_ANCHOR_X,
+				cy = this.style.y + SPHERE_ANCHOR_Y,
+				pdx = playerStyle.x + playerStyle.width / 2 - cx,
+				pdy = playerStyle.y + 2 * playerStyle.height / 3 - cy,
+				pdistSqrd = pdx * pdx + pdy * pdy;
 
 			model.x = plat.style.x + plat.hitX + (plat.hitWidth - SPHEREBOT_WIDTH) / 2;
 			model.y = plat.style.y + plat.hitY - BOT_FEET_Y + SPHEREBOT_HEIGHT / 2;
-			model.tr = pdx ? -atan(pdy / pdx) : -PI / 2;
+			model.tr = pdx ? atan2(pdy, pdx) + PI / 2 : -PI / 2;
+			var dr = model.tr - model.r;
+			if (dr > PI) {
+				model.r += 2 * PI;
+			} else if (dr < -PI) {
+				model.r -= 2 * PI;
+			}
 			model.r = (9 * model.r + model.tr) / 10;
+
+			if (model.attackCooldown > 0) {
+				model.attackCooldown -= dt;
+			} else if (pdistSqrd <= ATTACK_RANGE_SQRD) {
+				model.attackCooldown = ATTACK_COOLDOWN;
+				this.fireLaser();
+			}
 
 			style.x = model.x - SPHEREBOT_WIDTH / 2;
 			style.y = model.y - SPHEREBOT_HEIGHT / 2 - gameView.offsetY;

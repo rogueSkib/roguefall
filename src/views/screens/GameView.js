@@ -1,6 +1,8 @@
 import ui.View as View;
 import ui.ImageView as ImageView;
 
+import src.lib.ViewPool as ViewPool;
+
 import src.models.AppTick as AppTick;
 import src.models.Camera as Camera;
 
@@ -8,9 +10,11 @@ import src.views.helpers.Parallax as Parallax;
 import src.views.helpers.Platforms as Platforms;
 import src.views.helpers.Player as Player;
 import src.views.helpers.Input as Input;
+import src.views.helpers.Effects as Effects;
 import src.views.helpers.StatusBars as StatusBars;
 
 import src.views.helpers.Spherebot as Spherebot;
+import src.views.helpers.Laser as Laser;
 
 exports = Class(View, function(supr) {
 
@@ -86,6 +90,21 @@ exports = Class(View, function(supr) {
 			blockEvents: true
 		});
 
+		this.projectilePools = {};
+		this.projectilePools["LaserPool"] = new ViewPool({
+			ctor: Laser,
+			initCount: 5,
+			initOpts: {
+				parent: this.rootView,
+				gameView: this,
+				zIndex: 200
+			}
+		});
+
+		this.effects = new Effects({
+			gameView: this
+		});
+
 		this.input = new Input({
 			parent: this,
 			x: (this.style.width - BG_WIDTH) / 2,
@@ -116,8 +135,29 @@ exports = Class(View, function(supr) {
 		this.platforms.step(dt);
 		this.parallax.step(dt);
 		this.statusBars.step(dt);
+		this.effects.step(dt);
 		this.input.step(dt);
 
 		this.sphereBot.step(dt);
+
+		// step through active projectiles
+		for (var p in this.projectilePools) {
+			var pool = this.projectilePools[p];
+			for (var i = 0; i < pool._freshViewIndex; i++) {
+				pool.views[i].step(dt);
+			}
+		}
+	};
+
+	this.obtainProjectile = function(poolName) {
+		return this.projectilePools[poolName].obtainView({
+			parent: this.rootView,
+			gameView: this,
+			zIndex: 200
+		});
+	};
+
+	this.releaseProjectile = function(projectile, poolName) {
+		this.projectilePools[poolName].releaseView(projectile);
 	};
 });

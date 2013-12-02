@@ -199,6 +199,11 @@ exports = Class(View, function(supr) {
 		model.healthMax = model.health;
 		model.energy = BASE_ENERGY;
 		model.energyMax = model.energy;
+		// hit box for enemy attacks
+		model.hitX = -PLAYER_WIDTH / 4;
+		model.hitY = -PLAYER_HEIGHT / 4;
+		model.endHitX = PLAYER_WIDTH / 4;
+		model.endHitY = PLAYER_HEIGHT / 4;
 
 		this.ignoreVert = false;
 		this.ignoreHorz = false;
@@ -220,6 +225,15 @@ exports = Class(View, function(supr) {
 			this.sprite.startAnimation(stateData.action, stateData.opts);
 			stateData.blockInterrupts && (this.animating = true);
 		}
+	};
+
+	this.takeDamage = function(dmg) {
+		model.health -= dmg;
+		if (model.health <= 0) {
+			model.health = 0;
+			// TODO: game over
+		}
+		gameView.statusBars.setHealthPercent(model.health / model.healthMax);
 	};
 
 	this.jump = function() {
