@@ -20,10 +20,10 @@ exports = Class(View, function(supr) {
 
 	var controller,
 		gameView,
-		LASER_TIME = 500,
-		LASER_THICKNESS = 5,
-		LASER_LENGTH = 75,
-		LASER_DAMAGE = 10;
+		LASER_TIME = 750,
+		LASER_THICKNESS = 6,
+		LASER_LENGTH = 100,
+		LASER_DAMAGE = 15;
 
 	var PROJECTILE_POOL = "LaserPool";
 
@@ -88,7 +88,8 @@ exports = Class(View, function(supr) {
 	this.step = function(dt) {
 		var style = this.style,
 			model = this.model,
-			playerModel = gameView.player.model;
+			player = gameView.player,
+			playerModel = player.model;
 
 		style.x = model.x;
 		style.y = model.y - gameView.offsetY;
@@ -101,7 +102,7 @@ exports = Class(View, function(supr) {
 		{
 			this.laserAnim.clear();
 			this.finishLaser();
-			gameView.effects.emitLaserImpact(model.x, model.y);
+			gameView.effects.emitLaserImpact(model.x, model.y - gameView.offsetY);
 			gameView.player.takeDamage(LASER_DAMAGE);
 		}
 	};

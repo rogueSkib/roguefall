@@ -67,12 +67,6 @@ exports = Class(View, function(supr) {
 			zIndex: 100
 		});
 
-		this.sphereBot = new Spherebot({
-			parent: this.rootView,
-			gameView: this,
-			zIndex: 100
-		});
-
 		this.camera = new Camera({
 			gameView: this,
 			panningBounds: {
@@ -98,6 +92,17 @@ exports = Class(View, function(supr) {
 				parent: this.rootView,
 				gameView: this,
 				zIndex: 200
+			}
+		});
+
+		this.enemyPools = {};
+		this.enemyPools["SpherebotPool"] = new ViewPool({
+			ctor: Spherebot,
+			initCount: 2,
+			initOpts: {
+				parent: this.rootView,
+				gameView: this,
+				zIndex: 100
 			}
 		});
 
@@ -138,7 +143,13 @@ exports = Class(View, function(supr) {
 		this.effects.step(dt);
 		this.input.step(dt);
 
-		this.sphereBot.step(dt);
+		// step through active enemies
+		for (var p in this.enemyPools) {
+			var pool = this.enemyPools[p];
+			for (var i = 0; i < pool._freshViewIndex; i++) {
+				pool.views[i].step(dt);
+			}
+		}
 
 		// step through active projectiles
 		for (var p in this.projectilePools) {
@@ -147,6 +158,18 @@ exports = Class(View, function(supr) {
 				pool.views[i].step(dt);
 			}
 		}
+	};
+
+	this.obtainEnemy = function(poolName) {
+		return this.enemyPools[poolName].obtainView({
+			parent: this.rootView,
+			gameView: this,
+			zIndex: 100
+		});
+	};
+
+	this.releaseEnemy = function(enemy, poolName) {
+		this.enemyPools[poolName].releaseView(enemy);
 	};
 
 	this.obtainProjectile = function(poolName) {

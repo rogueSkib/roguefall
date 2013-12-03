@@ -48,9 +48,9 @@ exports = Class(View, function(supr) {
 		RUN_DECEL_MIN = 0.1,
 		RUN_DECEL_SLIDE = 2.5 * RUN_DECEL_MIN,
 		BASE_HEALTH = 100,
-		HEALTH_REGEN = 1,
+		HEALTH_REGEN = 3,
 		BASE_ENERGY = 100,
-		ENERGY_REGEN = 10,
+		ENERGY_REGEN = 15,
 		JUMP_ENERGY = 10,
 		RUSH_ENERGY = 15,
 		DIVE_ENERGY = 20;
@@ -94,45 +94,55 @@ exports = Class(View, function(supr) {
 		DEFAULT_Y = (BG_HEIGHT - PLAYER_HEIGHT) / 2;
 
 		this.FALL_SPEED_MAX = FALL_SPEED_MAX;
+		this.DEFAULT_Y = DEFAULT_Y;
 
 		STATES[STATE_IDLE] = {
 			action: "idle",
-			opts: { iterations: Infinity }
+			opts: { iterations: Infinity },
+			blockInterrupts: false,
+			attacking: false
 		};
 		STATES[STATE_RUNNING] = {
 			action: "run",
-			opts: { iterations: Infinity }
+			opts: { iterations: Infinity },
+			blockInterrupts: false,
+			attacking: false
 		};
 		STATES[STATE_RUSHING] = {
 			action: "rush",
 			opts: { iterations: Infinity },
-			blockInterrupts: true
+			blockInterrupts: true,
+			attacking: true
 		};
 		STATES[STATE_FALLING] = {
 			action: "fall",
-			opts: { iterations: Infinity }
+			opts: { iterations: Infinity },
+			blockInterrupts: false,
+			attacking: false
 		};
 		STATES[STATE_LANDING] = {
 			action: "land",
-			opts: {
-				iterations: 1,
-				callback: bind(this, 'finishLanding')
-			},
-			blockInterrupts: true
+			opts: { iterations: 1, callback: bind(this, 'finishLanding') },
+			blockInterrupts: true,
+			attacking: false
 		};
 		STATES[STATE_WALL_SLIDING] = {
 			action: "wallSlide",
-			opts: { iterations: Infinity }
+			opts: { iterations: Infinity },
+			blockInterrupts: false,
+			attacking: false
 		};
 		STATES[STATE_JUMPING] = {
 			action: "jump",
 			opts: { iterations: Infinity },
-			blockInterrupts: true
+			blockInterrupts: true,
+			attacking: true
 		};
 		STATES[STATE_DIVING] = {
 			action: "dive",
 			opts: { iterations: Infinity },
-			blockInterrupts: true
+			blockInterrupts: true,
+			attacking: true
 		};
 
 		model = this.model = {};
@@ -200,10 +210,10 @@ exports = Class(View, function(supr) {
 		model.energy = BASE_ENERGY;
 		model.energyMax = model.energy;
 		// hit box for enemy attacks
-		model.hitX = -PLAYER_WIDTH / 4;
-		model.hitY = -PLAYER_HEIGHT / 4;
-		model.endHitX = PLAYER_WIDTH / 4;
-		model.endHitY = PLAYER_HEIGHT / 4;
+		model.hitX = -PLAYER_WIDTH / 6;
+		model.hitY = DEFAULT_Y + PLAYER_HEIGHT / 3;
+		model.endHitX = PLAYER_WIDTH / 6;
+		model.endHitY = DEFAULT_Y + PLAYER_FEET;
 
 		this.ignoreVert = false;
 		this.ignoreHorz = false;
@@ -214,16 +224,18 @@ exports = Class(View, function(supr) {
 		this.hasDived = false;
 		this.falling = false;
 		this.flipping = false;
+		this.attacking = false;
 
 		this.setState(STATE_DEFAULT, true);
 	};
 
 	this.setState = function(state, force) {
-		if (force || (!this.animating && this.state !== state)) {
+		if (force || (!this.blockInterrupts && this.state !== state)) {
 			var stateData = STATES[state];
 			this.state = state;
 			this.sprite.startAnimation(stateData.action, stateData.opts);
-			stateData.blockInterrupts && (this.animating = true);
+			this.blockInterrupts = stateData.blockInterrupts;
+			this.attacking = stateData.attacking;
 		}
 	};
 
@@ -270,7 +282,7 @@ exports = Class(View, function(supr) {
 	this.finishFlip = function() {
 		this.sprite.style.r = 0;
 		this.flipping = false;
-		!this.hasRushed && (this.animating = false);
+		!this.hasRushed && (this.blockInterrupts = false);
 	};
 
 	this.rush = function(dx) {
@@ -307,7 +319,7 @@ exports = Class(View, function(supr) {
 
 	this.finishRush = function() {
 		this.sprite.style.r = 0;
-		this.animating = false;
+		this.blockInterrupts = false;
 		this.hasRushed = false;
 		this.ignoreVert = false;
 		this.ignoreHorz = false;
@@ -351,7 +363,7 @@ exports = Class(View, function(supr) {
 		if (!this.hasLanded) {
 			this.setState(STATE_DIVING, true);
 		} else {
-			this.animating = false;
+			this.blockInterrupts = false;
 		}
 
 		this.flipping = false;
@@ -359,12 +371,12 @@ exports = Class(View, function(supr) {
 	};
 
 	this.finishDive = function() {
-		this.animating = false;
+		this.blockInterrupts = false;
 		this.ignoreVert = false;
 	};
 
 	this.finishLanding = function() {
-		this.animating = false;
+		this.blockInterrupts = false;
 		this.flipping = false;
 		this.setState(STATE_IDLE);
 	};
@@ -540,9 +552,9 @@ exports = Class(View, function(supr) {
 		for (var p = 0; p < platforms.length; p++) {
 			var platform = platforms[p];
 			var platX = platform.style.x + platform.hitX;
-			var platY = platform.style.y + platform.hitY - DEFAULT_Y;
+			var platY = platform.style.y + platform.hitY;
 			var platEndX = platX + platform.hitWidth;
-			if (startY + PLAYER_FEET <= platY && model.y + PLAYER_FEET >= platY) {
+			if (startY + model.endHitY <= platY && model.y + model.endHitY >= platY) {
 				if (model.x >= platX && model.x <= platEndX) {
 					// force dive finish
 					if (this.hasDived) {
@@ -560,7 +572,7 @@ exports = Class(View, function(supr) {
 						this.setState(STATE_LANDING);
 					}
 
-					model.y = platY - PLAYER_FEET;
+					model.y = platY - model.endHitY;
 					model.vy = 0;
 					model.ay = 0;
 					this.hasJumped = false;
