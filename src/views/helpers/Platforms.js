@@ -38,6 +38,17 @@ var platformConfig = [
 
 exports = Class(View, function(supr) {
 
+	// math shortcuts
+	var min = Math.min,
+		max = Math.max,
+		random = Math.random,
+		sin = Math.sin,
+		cos = Math.cos,
+		atan = Math.atan,
+		abs = Math.abs,
+		pow = Math.pow,
+		PI = Math.PI;
+
 	var controller,
 		gameView,
 		BG_WIDTH,
@@ -48,6 +59,8 @@ exports = Class(View, function(supr) {
 		SPAWN_STEP = SPAWN_WIDTH / SPAWN_SPACES,
 		SPAWN_GAP_BASE = 128,
 		SPAWN_GAP_RANGE = 512;
+
+	var SPHEREBOT_POOL = "SpherebotPool";
 
 	this.init = function(opts) {
 		supr(this, 'init', [opts]);
@@ -121,7 +134,7 @@ exports = Class(View, function(supr) {
 				i++;
 			}
 
-			// spawn views as they come onto the scren
+			// spawn views as they come onto the screen
 			var z = 0;
 			while (this.spawnY <= y + BG_HEIGHT) {
 				var data = this.config[~~(random() * this.config.length)];
@@ -169,6 +182,12 @@ exports = Class(View, function(supr) {
 		plat.hitWidth = data.hitWidth;
 		plat.setImage(data.image);
 		this.active.push(plat);
+
+		// spawn enemies!
+		if (random() < 0.5) {
+			var bot = gameView.obtainEnemy(SPHEREBOT_POOL);
+			bot.reset(plat);
+		}
 
 		return x;
 	};

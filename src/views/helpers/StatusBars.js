@@ -104,9 +104,9 @@ exports = Class(ImageView, function(supr) {
 		}
 
 		var dh = hcs.width - initialHealth;
-		if (dh > 0.1) {
+		if (dh > 0.05) {
 			this.emitGainParticle(hcs.width, HEALTH_Y, SPARK_HEALTH);
-		} else if (dh < -0.1) {
+		} else if (dh < -0.05) {
 			this.emitLossParticle(hcs.width, HEALTH_Y, SPARK_HEALTH);
 		}
 
