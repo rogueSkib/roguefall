@@ -26,21 +26,21 @@ exports = Class(View, function(supr) {
 		RIGHT_WALL_SLIDE_X,
 		RUSH_DISTANCE,
 		DEFAULT_Y,
-		RUSH_TIME = 325,
-		DIVE_TIME = 650,
+		RUSH_TIME = 350,
+		DIVE_TIME = 800,
 		PLAYER_WIDTH = 164,
 		PLAYER_HEIGHT = 164,
 		PLAYER_FEET = 154,
 		GRAVITY = 0.00275,
-		AIR_RESISTANCE = 0.0032,
-		WALL_RESISTANCE = 0.0072,
+		AIR_RESISTANCE = 0.0016,
+		WALL_RESISTANCE = 0.0064,
 		WALL_WIDTH = 58,
 		JUMP_ACCEL = -0.02,
 		JUMP_ACCEL_TIME = 125,
 		JUMP_ROT = 6 * PI,
 		JUMP_ROT_TIME = 750,
 		FALL_SPEED_MAX = GRAVITY / AIR_RESISTANCE,
-		DIVE_SPEED = 2.5 * FALL_SPEED_MAX,
+		DIVE_SPEED = 2 * FALL_SPEED_MAX,
 		RUN_SPEED_MAX = 0.9,
 		RUN_ACCEL_MAX = 0.009,
 		RUN_ACCEL_TIME = 150,
@@ -327,10 +327,10 @@ exports = Class(View, function(supr) {
 		this.setTargetX(model.x);
 	};
 
-	this.dive = function() {
+	this.dive = function(dx, dy) {
 		if (model.energy < DIVE_ENERGY) {
 			return;
-		} else if (!this.hasDived && !this.hasLanded && !this.hasRushed) {
+		} else if (!this.hasDived && !this.hasRushed) {
 			this.hasDived = true;
 		} else {
 			return;
@@ -373,6 +373,7 @@ exports = Class(View, function(supr) {
 	this.finishDive = function() {
 		this.blockInterrupts = false;
 		this.ignoreVert = false;
+		this.hasDived = false;
 	};
 
 	this.finishLanding = function() {

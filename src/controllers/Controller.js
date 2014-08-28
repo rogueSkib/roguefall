@@ -5,6 +5,7 @@ import Sound;
 import ui.View as View;
 import ui.TextView as TextView;
 import ui.ImageView as ImageView;
+import ui.resource.loader as loader;
 
 import event.Emitter as Emitter;
 
@@ -118,7 +119,7 @@ var Controller = Class(Emitter, function() {
 
 		// preload what we need, and then transition
 		if (preloads) {
-			GCResources.preload(preloads, boundTransition);
+			loader.preload(preloads, boundTransition);
 		} else {
 			boundTransition();
 		}
